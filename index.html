@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TripMate — Minimal Itinerary Chatbot</title>
+  <style>
+    :root{--bg:#f3f4f6;--card:#fff;--accent:#0b74da;--muted:#6b7280}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:var(--bg); margin:0; padding:24px;}
+    .app{max-width:720px;margin:8px auto;background:var(--card);box-shadow:0 6px 18px rgba(15,23,42,0.06);border-radius:12px;overflow:hidden}
+    header{padding:18px 20px;border-bottom:1px solid #eef2f7}
+    header h1{margin:0;font-size:18px}
+    header p{margin:6px 0 0;color:var(--muted);font-size:13px}
+
+    .chat{height:420px;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
+    .bubble{max-width:82%;padding:12px 14px;border-radius:14px;line-height:1.35}
+    .user{align-self:flex-end;background:#e6f0ff;color:#062d51;border-bottom-right-radius:6px}
+    .bot{align-self:flex-start;background:#f3f4f6;color:#0b1720;border-bottom-left-radius:6px}
+    .meta{font-size:12px;color:var(--muted);margin-top:6px}
+
+    .compose{display:flex;padding:12px;border-top:1px solid #eef2f7;gap:8px}
+    .compose input{flex:1;padding:10px 12px;border-radius:8px;border:1px solid #e6e9ef;font-size:14px}
+    .compose button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+    .small{font-size:12px;color:var(--muted);padding:10px 18px}
+
+    .hint{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .chip{background:#eef2f7;color:#0b3a66;padding:6px 10px;border-radius:999px;font-size:13px}
+
+    footer{padding:12px 18px;font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>TripMate — Minimal Itinerary Chatbot</h1>
+      <p>Ask things like "what's on today?" or "what's on 2025-10-28"</p>
+    </header>
+
+    <div class="chat" id="chat">
+      <!-- messages show up here -->
+    </div>
+
+    <div class="compose">
+      <input id="userInput" placeholder="Type a question (e.g. what's on today?)" />
+      <button id="sendBtn">Ask</button>
+    </div>
+
+    <div class="small" style="padding-top:4px">
+      Quick hints:
+      <div class="hint">
+        <div class="chip">what's on today?</div>
+        <div class="chip">what's on tomorrow?</div>
+        <div class="chip">what's on 2025-10-28</div>
+        <div class="chip">list all</div>
+      </div>
+    </div>
+    <footer>To edit your trip: open this file and edit the <code>itinerary</code> object in the JavaScript section.</footer>
+  </div>
+
+<script>
+  /*********************
+   *  EDIT THIS OBJECT
+   *  -- put your trip events here --
+   *  Keys are date strings in YYYY-MM-DD format
+   *  Example: "2025-10-24": ["Check-in at Airbnb", "Dinner at local restaurant"]
+   *********************/
+  const itinerary = {
+    "2025-10-24": ["Check-in at main Airbnb", "Dinner nearby"],
+    "2025-10-25": ["Museum visit", "Lunch at Central Market", "Evening city walking tour"],
+    "2025-10-28": ["Check into beach Airbnb", "Afternoon at the beach"],
+    "2025-10-29": ["Surf lesson", "Seafood dinner"],
+    "2025-10-30": ["Return to main Airbnb", "Night market visit"]
+  };
+
+  // ---------- utility date helpers ----------
+  function pad(n){return n.toString().padStart(2,'0')}
+  function toYMD(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` }
+  function readableDate(ymd){
+    const d = new Date(ymd + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric', year:'numeric' });
+  }
+
+  // Try to parse common user date formats (YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, "28 Oct 2025")
+  function parseUserDate(text){
+    text = text.trim();
+    // 1) explicit YYYY-MM-DD
+    let m = text.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(m){ const [y,mo,da] = [m[1], pad(m[2]), pad(m[3])]; return `${y}-${mo}-${da}` }
+
+    // 2) DD/MM/YYYY or DD-MM-YYYY
+    m = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})/);
+    if(m){ const [d,mo,y] = [pad(m[1]), pad(m[2]), m[3]]; return `${y}-${mo}-${d}` }
+
+    // 3) day + month name + optional year: e.g. "28 Oct", "28 October 2025"
+    m = text.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december)\s*(\d{4})?/i);
+    if(m){
+      const day = pad(m[1]);
+      const monthName = m[2].toLowerCase();
+      const year = m[3] || new Date().getFullYear();
+      const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12, january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12 };
+      let mm = months[monthName]; if(!mm) mm = months[monthName.slice(0,3)];
+      return `${year}-${pad(mm)}-${day}`;
+    }
+
+    // 4) try Date.parse fallback
+    const d = new Date(text);
+    if(!isNaN(d)) return toYMD(d);
+
+    return null;
+  }
+
+  // ---------- main logic ----------
+  function findScheduleFromQuery(q){
+    q = q.toLowerCase();
+    // direct keywords
+    if(/\btoday\b/.test(q)){
+      return { type:'date', date: toYMD(new Date()) };
+    }
+    if(/\btomorrow\b/.test(q)){
+      const d = new Date(); d.setDate(d.getDate()+1); return { type:'date', date: toYMD(d) };
+    }
+    if(/\byesterday\b/.test(q)){
+      const d = new Date(); d.setDate(d.getDate()-1); return { type:'date', date: toYMD(d) };
+    }
+    if(/\blist|all|itinerary\b/.test(q)){
+      return { type:'all' };
+    }
+
+    // try to extract a date-like substring
+    // look for YYYY-MM-DD first
+    let m = q.match(/(20\d{2}[-\/]\d{1,2}[-\/]\d{1,2})/);
+    if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
+
+    // look for dd/mm/yyyy or textual date (e.g. 28 Oct 2025)
+    m = q.match(/(\d{1,2}[-\/]\d{1,2}[-\/]20\d{2})/);
+    if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
+
+    // try month-name style
+    m = q.match(/(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s*\d{0,4})/i);
+    if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
+
+    // last resort: try to parse full input as date
+    const parsed = parseUserDate(q);
+    if(parsed) return { type:'date', date: parsed };
+
+    return { type:'unknown' };
+  }
+
+  // build reply text for a date
+  function replyForDate(ymd){
+    if(itinerary[ymd]){
+      const events = itinerary[ymd];
+      let txt = `${readableDate(ymd)} — You have ${events.length} planned item${events.length>1?"s":""}:\n`;
+      events.forEach((e,i)=> txt += `${i+1}. ${e}\n`);
+      return txt.trim();
+    }
+    return `No events scheduled for ${readableDate(ymd)}. You can add events by editing the itinerary object in this file (use YYYY-MM-DD keys).`;
+  }
+
+  function replyListAll(){
+    const keys = Object.keys(itinerary).sort();
+    if(keys.length===0) return 'No events in itinerary yet. Add events in the itinerary object.';
+    let out = 'Full trip itinerary:\n';
+    keys.forEach(k=>{
+      out += `\n${readableDate(k)}:\n`;
+      itinerary[k].forEach((e,i)=> out += `  ${i+1}. ${e}\n`);
+    });
+    return out.trim();
+  }
+
+  // ---------- UI helpers ----------
+  const chat = document.getElementById('chat');
+  function addMessage(text, who='bot'){
+    const div = document.createElement('div');
+    div.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
+    // preserve newlines
+    div.innerHTML = text.split('\n').map(x=>`<div>${escapeHtml(x)}</div>`).join('');
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+  // ---------- interaction ----------
+  const input = document.getElementById('userInput');
+  const btn = document.getElementById('sendBtn');
+  function handleQuery(){
+    const q = input.value.trim(); if(!q) return;
+    addMessage(q,'user');
+    input.value = '';
+
+    const parsed = findScheduleFromQuery(q);
+    if(parsed.type === 'date'){
+      addMessage(replyForDate(parsed.date),'bot');
+    } else if(parsed.type === 'all'){
+      addMessage(replyListAll(),'bot');
+    } else {
+      addMessage("Sorry, I couldn't find a date in that question. Try: 'what's on today?', 'what's on 2025-10-28', or 'list all'.",'bot');
+    }
+  }
+
+  btn.addEventListener('click', handleQuery);
+  input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') handleQuery() });
+
+  // initial friendly message
+  addMessage("Hey — I'm your trip chatbot. Ask me things like \"what's on today?\" or \"what's on 2025-10-28\". To update the trip, edit the itinerary object in this file.", 'bot');
+
+</script>
+</body>
+</html>
