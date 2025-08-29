@@ -135,4 +135,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function replyListAll(){
     const keys = Object.keys(itinerary).sort();
-    if(keys.length===0) return 'No events in itinerary y
+    if(keys.length===0) return 'No events in itinerary yet. Add events in the itinerary object.';
+    let out = 'Full trip itinerary:\n';
+    keys.forEach(k=>{
+      out += `\n${readableDate(k)}:\n`;
+      itinerary[k].forEach((e,i)=> out += `  ${i+1}. ${e.text || e}\n`);
+    });
+    return out.trim();
+  }
+
+  const chat = document.getElementById('chat');
+  function addMessage(text, who='bot'){
+    const div = document.createElement('div');
+    div.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
+
+    if(who === 'user'){
+      // escape user
