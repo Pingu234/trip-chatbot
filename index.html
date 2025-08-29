@@ -60,12 +60,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
-  /*********************
-   *  EDIT THIS OBJECT
-   *  -- put your trip events here --
-   *  Keys are date strings in YYYY-MM-DD format
-   *  Example: "2025-10-24": [{text:"Check-in at Airbnb", image:"airbnb.jpg"}]
-   *********************/
   const itinerary = {
     "2025-10-24": [
       { text: "Flight to INCHEON (KOR) 11:45AM-8:15PM", image: "flight1.jpg" },
@@ -73,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ]
   };
 
-  // ---------- utility date helpers ----------
   function pad(n){return n.toString().padStart(2,'0')}
   function toYMD(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` }
   function readableDate(ymd){
@@ -105,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
-  // ---------- main logic ----------
   function findScheduleFromQuery(q){
     q = q.toLowerCase();
     if(/\btoday\b/.test(q)) return { type:'date', date: toYMD(new Date()) };
@@ -143,48 +135,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function replyListAll(){
     const keys = Object.keys(itinerary).sort();
-    if(keys.length===0) return 'No events in itinerary yet. Add events in the itinerary object.';
-    let out = 'Full trip itinerary:\n';
-    keys.forEach(k=>{
-      out += `\n${readableDate(k)}:\n`;
-      itinerary[k].forEach((e,i)=> out += `  ${i+1}. ${e.text || e}\n`);
-    });
-    return out.trim();
-  }
-
-  // ---------- UI helpers ----------
-  const chat = document.getElementById('chat');
-  function addMessage(text, who='bot'){
-    const div = document.createElement('div');
-    div.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
-    div.innerHTML = text.split('\n').map(x=>`<div>${escapeHtml(x)}</div>`).join('');
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-  }
-  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
-
-  // ---------- interaction ----------
-  const input = document.getElementById('userInput');
-  const btn = document.getElementById('sendBtn');
-
-  function handleQuery(){
-    const q = input.value.trim(); if(!q) return;
-    addMessage(q,'user');
-    input.value = '';
-
-    const parsed = findScheduleFromQuery(q);
-    if(parsed.type === 'date') addMessage(replyForDate(parsed.date),'bot');
-    else if(parsed.type === 'all') addMessage(replyListAll(),'bot');
-    else addMessage(`Sorry, I couldn't find a date in that question. Try: "what's on today?", "what's on 2025-10-28", or "list all".`, 'bot');
-  }
-
-  btn.addEventListener('click', handleQuery);
-  input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') handleQuery() });
-
-  // initial friendly message
-  addMessage(`Hey — I'm your trip chatbot. Ask me things like "what's on today?" or "what's on 2025-10-28". To update the trip, edit the itinerary object in this file.`, 'bot');
-
-});
-</script>
-</body>
-</html>
+    if(keys.length===0) return 'No events in itinerary y
