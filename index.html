@@ -58,17 +58,19 @@
   </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+
   /*********************
    *  EDIT THIS OBJECT
    *  -- put your trip events here --
    *  Keys are date strings in YYYY-MM-DD format
-   *  Example: "2025-10-24": ["Check-in at Airbnb", "Dinner at local restaurant"]
+   *  Example: "2025-10-24": [{text:"Check-in at Airbnb", image:"airbnb.jpg"}]
    *********************/
   const itinerary = {
-     "2025-10-24": [
-    { text: "Flight to INCHEON (KOR) 11:45AM-8:15PM", image: "flight1.jpg" },
-    { text: "AIRBNB Check-IN", image: "" }
-  ],
+    "2025-10-24": [
+      { text: "Flight to INCHEON (KOR) 11:45AM-8:15PM", image: "flight1.jpg" },
+      { text: "AIRBNB Check-IN", image: "" }
+    ]
   };
 
   // ---------- utility date helpers ----------
@@ -79,18 +81,14 @@
     return d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric', year:'numeric' });
   }
 
-  // Try to parse common user date formats (YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, "28 Oct 2025")
   function parseUserDate(text){
     text = text.trim();
-    // 1) explicit YYYY-MM-DD
     let m = text.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
     if(m){ const [y,mo,da] = [m[1], pad(m[2]), pad(m[3])]; return `${y}-${mo}-${da}` }
 
-    // 2) DD/MM/YYYY or DD-MM-YYYY
     m = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})/);
     if(m){ const [d,mo,y] = [pad(m[1]), pad(m[2]), m[3]]; return `${y}-${mo}-${d}` }
 
-    // 3) day + month name + optional year: e.g. "28 Oct", "28 October 2025"
     m = text.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december)\s*(\d{4})?/i);
     if(m){
       const day = pad(m[1]);
@@ -101,7 +99,6 @@
       return `${year}-${pad(mm)}-${day}`;
     }
 
-    // 4) try Date.parse fallback
     const d = new Date(text);
     if(!isNaN(d)) return toYMD(d);
 
@@ -111,55 +108,38 @@
   // ---------- main logic ----------
   function findScheduleFromQuery(q){
     q = q.toLowerCase();
-    // direct keywords
-    if(/\btoday\b/.test(q)){
-      return { type:'date', date: toYMD(new Date()) };
-    }
-    if(/\btomorrow\b/.test(q)){
-      const d = new Date(); d.setDate(d.getDate()+1); return { type:'date', date: toYMD(d) };
-    }
-    if(/\byesterday\b/.test(q)){
-      const d = new Date(); d.setDate(d.getDate()-1); return { type:'date', date: toYMD(d) };
-    }
-    if(/\blist|all|itinerary\b/.test(q)){
-      return { type:'all' };
-    }
+    if(/\btoday\b/.test(q)) return { type:'date', date: toYMD(new Date()) };
+    if(/\btomorrow\b/.test(q)) { const d = new Date(); d.setDate(d.getDate()+1); return { type:'date', date: toYMD(d) }; }
+    if(/\byesterday\b/.test(q)) { const d = new Date(); d.setDate(d.getDate()-1); return { type:'date', date: toYMD(d) }; }
+    if(/\blist|all|itinerary\b/.test(q)) return { type:'all' };
 
-    // try to extract a date-like substring
-    // look for YYYY-MM-DD first
     let m = q.match(/(20\d{2}[-\/]\d{1,2}[-\/]\d{1,2})/);
     if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
 
-    // look for dd/mm/yyyy or textual date (e.g. 28 Oct 2025)
     m = q.match(/(\d{1,2}[-\/]\d{1,2}[-\/]20\d{2})/);
     if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
 
-    // try month-name style
     m = q.match(/(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s*\d{0,4})/i);
     if(m){ const parsed = parseUserDate(m[1]); if(parsed) return {type:'date', date:parsed} }
 
-    // last resort: try to parse full input as date
     const parsed = parseUserDate(q);
     if(parsed) return { type:'date', date: parsed };
 
     return { type:'unknown' };
   }
 
-  // build reply text for a date
   function replyForDate(ymd){
-  if(itinerary[ymd]){
-    const events = itinerary[ymd];
-    let html = `<strong>${readableDate(ymd)}</strong> — You have ${events.length} item${events.length>1?"s":""}:<br>`;
-    events.forEach((e,i)=>{
-      html += `${i+1}. ${e.text || e} <br>`;
-      if(e.image){
-        html += `<img src="${e.image}" style="max-width:200px; border-radius:8px; margin:6px 0;"><br>`;
-      }
-    });
-    return html;
+    if(itinerary[ymd]){
+      const events = itinerary[ymd];
+      let html = `<strong>${readableDate(ymd)}</strong> — You have ${events.length} item${events.length>1?"s":""}:<br>`;
+      events.forEach((e,i)=>{
+        html += `${i+1}. ${e.text || e} <br>`;
+        if(e.image) html += `<img src="${e.image}" style="max-width:200px; border-radius:8px; margin:6px 0;"><br>`;
+      });
+      return html;
+    }
+    return `No events scheduled for ${readableDate(ymd)}.`;
   }
-  return `No events scheduled for ${readableDate(ymd)}.`;
-}
 
   function replyListAll(){
     const keys = Object.keys(itinerary).sort();
@@ -167,7 +147,7 @@
     let out = 'Full trip itinerary:\n';
     keys.forEach(k=>{
       out += `\n${readableDate(k)}:\n`;
-      itinerary[k].forEach((e,i)=> out += `  ${i+1}. ${e}\n`);
+      itinerary[k].forEach((e,i)=> out += `  ${i+1}. ${e.text || e}\n`);
     });
     return out.trim();
   }
@@ -177,7 +157,6 @@
   function addMessage(text, who='bot'){
     const div = document.createElement('div');
     div.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
-    // preserve newlines
     div.innerHTML = text.split('\n').map(x=>`<div>${escapeHtml(x)}</div>`).join('');
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
@@ -187,27 +166,25 @@
   // ---------- interaction ----------
   const input = document.getElementById('userInput');
   const btn = document.getElementById('sendBtn');
+
   function handleQuery(){
     const q = input.value.trim(); if(!q) return;
     addMessage(q,'user');
     input.value = '';
 
     const parsed = findScheduleFromQuery(q);
-    if(parsed.type === 'date'){
-      addMessage(replyForDate(parsed.date),'bot');
-    } else if(parsed.type === 'all'){
-      addMessage(replyListAll(),'bot');
-    } else {
-      addMessage("Sorry, I couldn't find a date in that question. Try: 'what's on today?', 'what's on 2025-10-28', or 'list all'.",'bot');
-    }
+    if(parsed.type === 'date') addMessage(replyForDate(parsed.date),'bot');
+    else if(parsed.type === 'all') addMessage(replyListAll(),'bot');
+    else addMessage(`Sorry, I couldn't find a date in that question. Try: "what's on today?", "what's on 2025-10-28", or "list all".`, 'bot');
   }
 
   btn.addEventListener('click', handleQuery);
   input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') handleQuery() });
 
   // initial friendly message
-  addMessage("Hey — I'm your trip chatbot. Ask me things like \"what's on today?\" or \"what's on 2025-10-28\". To update the trip, edit the itinerary object in this file.", 'bot');
+  addMessage(`Hey — I'm your trip chatbot. Ask me things like "what's on today?" or "what's on 2025-10-28". To update the trip, edit the itinerary object in this file.`, 'bot');
 
+});
 </script>
 </body>
 </html>
