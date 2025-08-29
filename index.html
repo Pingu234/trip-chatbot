@@ -165,14 +165,19 @@
 
   // build reply text for a date
   function replyForDate(ymd){
-    if(itinerary[ymd]){
-      const events = itinerary[ymd];
-      let txt = `${readableDate(ymd)} — You have ${events.length} planned item${events.length>1?"s":""}:\n`;
-      events.forEach((e,i)=> txt += `${i+1}. ${e}\n`);
-      return txt.trim();
-    }
-    return `No events scheduled for ${readableDate(ymd)}. You can add events by editing the itinerary object in this file (use YYYY-MM-DD keys).`;
+  if(itinerary[ymd]){
+    const events = itinerary[ymd];
+    let html = `<strong>${readableDate(ymd)}</strong> — You have ${events.length} item${events.length>1?"s":""}:<br>`;
+    events.forEach((e,i)=>{
+      html += `${i+1}. ${e.text || e} <br>`;
+      if(e.image){
+        html += `<img src="${e.image}" style="max-width:200px; border-radius:8px; margin:6px 0;"><br>`;
+      }
+    });
+    return html;
   }
+  return `No events scheduled for ${readableDate(ymd)}.`;
+}
 
   function replyListAll(){
     const keys = Object.keys(itinerary).sort();
